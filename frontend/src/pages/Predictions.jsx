@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from "react";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import IconButton from "@mui/material/IconButton";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import { getPredictionsLatest, postPrediction } from "../services/api";
+import { getPredictionsLatest } from "../services/api";
 
 export default function Predictions() {
   const [preds, setPreds] = useState([]);
