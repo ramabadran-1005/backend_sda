@@ -1,0 +1,28 @@
+:root{
+    --primary-green: #184d19;
+    --accent-yellow: #ffc107;
+    --bg: #f8f8f8;
+  }
+  
+  html,body,#root {
+    height: 100%;
+    margin: 0;
+    font-family: Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+  }
+  
+  /* Simple page container */
+  main {
+    padding: 16px;
+  }
+  
+  /* cards */
+  .MuiPaper-root {
+    border-radius: 12px;
+  }
+  
+  /* small responsive tweaks */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+  }
+  

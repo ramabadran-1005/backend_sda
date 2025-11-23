@@ -1,0 +1,51 @@
+#!/bin/bash
+
+echo "🔥 Cleaning backend folder…"
+
+# 1. Remove node_modules
+echo "🗑 Removing node_modules…"
+rm -rf node_modules
+
+# 2. Remove all .zip files
+echo "🗑 Removing all ZIP files…"
+find . -name "*.zip" -type f -delete
+
+# 3. Remove unwanted folders
+echo "🗑 Removing heavy folders…"
+rm -rf ml
+rm -rf iot_dashboard_app*
+rm -rf Nwarehouse-Dashboard-master*
+rm -rf nwh-webpage-master*
+rm -rf node_modules.zip
+rm -rf models.zip
+rm -rf src.zip
+rm -rf utils.zip
+rm -rf controllers.zip
+rm -rf routes.zip
+rm -rf config.zip
+
+# 4. Create proper .gitignore
+echo "📝 Creating .gitignore…"
+cat > .gitignore <<EOF
+node_modules/
+*.zip
+.env
+*.log
+__pycache__/
+EOF
+
+# 5. Reset last commit
+echo "🔄 Removing previously staged large files…"
+git reset --hard
+
+# 6. Stage only backend files
+echo "📦 Staging clean backend files…"
+git add server.js package.json package-lock.json
+git add api routes models config middleware utils
+
+# 7. Commit clean backend
+echo "📝 Committing clean backend…"
+git commit -m "clean backend for render deployment"
+
+echo "🚀 Now push using: git push -u origin main"
+echo "✔ Cleanup complete!"
