@@ -1,19 +1,12 @@
 {
-  "name": "src",
+  "name": "backend_sda",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
-    "@tensorflow/tfjs-node": "^4.22.0",
     "bcrypt": "^6.0.0",
-    "body-parser": "^2.2.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -24,8 +17,6 @@
     "firebase-admin": "^13.6.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^9.0.0",
-    "morgan": "^1.10.1",
-    "nodemon": "^3.1.11"
+    "morgan": "^1.10.1"
   }
 }
