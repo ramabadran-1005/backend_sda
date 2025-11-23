@@ -1,6 +1,4 @@
-// =========================
-// server.js - Firestore Backend (ROOT COPY)
-// =========================
+
 
 require("dotenv").config();
 const express = require("express");
@@ -11,9 +9,7 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 const bcrypt = require("bcrypt");
 
-// =========================
-// FIREBASE ADMIN INIT
-// =========================
+
 const admin = require("firebase-admin");
 
 let serviceAccount;
@@ -37,9 +33,6 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-// =========================
-// EXPRESS SETUP
-// =========================
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -49,7 +42,7 @@ app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(morgan("dev"));
 
-// Basic Rate Limiter
+
 app.use(
   "/api/",
   rateLimit({
@@ -58,9 +51,7 @@ app.use(
   })
 );
 
-// =========================
-// HEALTH CHECK
-// =========================
+
 app.get("/healthz", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
@@ -183,16 +174,12 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 
-// =========================
-// 404 HANDLER
-// =========================
+
 app.use((req, res) => {
   res.status(404).json({ error: "Not Found" });
 });
 
-// =========================
-// START SERVER
-// =========================
+
 app.listen(PORT, () => {
   console.log(`🔥 Server running on port ${PORT}`);
 });
