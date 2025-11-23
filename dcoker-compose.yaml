@@ -1,0 +1,62 @@
+version: "3.8"
+services:
+  mongo:
+    image: mongo:6
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mongo
+      - ml
+    environment:
+      - PORT=4000
+      - MONGO_URI=mongodb://mongo:27017/nwarehouse
+      - NODE_ENV=production
+      - ML_BASE=http://ml:5000
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./:/usr/src/app
+    command: ["node", "app.js"]
+
+  ml:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      - MODEL_PATH=/app/ml/saved_models
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./ml:/app/ml
+
+  mongo-express:
+    image: mongo-express:1.0.0
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongo
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: pass
+    ports:
+      - "8081:8081"
+
+volumes:
+  mongo-data:
