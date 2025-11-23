@@ -130,7 +130,7 @@ app.post("/api/alerts", async (req, res) => {
 });
 
 // =========================
-– AUTH: REGISTER & LOGIN
+// AUTH: REGISTER & LOGIN
 // =========================
 app.post("/api/auth/register", async (req, res) => {
   try {
@@ -181,6 +181,7 @@ app.post("/api/auth/login", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // =========================
 // 404 HANDLER
