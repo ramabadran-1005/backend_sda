@@ -16,20 +16,18 @@ const bcrypt = require("bcrypt");
 // =========================
 const admin = require("firebase-admin");
 
-const CRED_PATH =
-  process.env.FIREBASE_CRED_PATH ||
-  process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
-if (!CRED_PATH) {
-  console.error("❌ Missing FIREBASE_CRED_PATH");
-  process.exit(1);
-}
-
 let serviceAccount;
-try {
-  serviceAccount = require(CRED_PATH);
-} catch (err) {
-  console.error("❌ Could not load Firebase credential:", err.message);
+
+// Render-safe: credentials come from ENV variable
+if (process.env.FIREBASE_CREDENTIALS_JSON) {
+  try {
+    serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS_JSON);
+  } catch (err) {
+    console.error("❌ Failed to parse FIREBASE_CREDENTIALS_JSON:", err.message);
+    process.exit(1);
+  }
+} else {
+  console.error("❌ FIREBASE_CREDENTIALS_JSON is not set in Render");
   process.exit(1);
 }
 
@@ -132,7 +130,7 @@ app.post("/api/alerts", async (req, res) => {
 });
 
 // =========================
-// AUTH: REGISTER & LOGIN
+– AUTH: REGISTER & LOGIN
 // =========================
 app.post("/api/auth/register", async (req, res) => {
   try {
