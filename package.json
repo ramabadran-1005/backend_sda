@@ -1,9 +1,9 @@
 {
   "name": "backend_sda",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "app.cjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node app.cjs"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -17,6 +17,8 @@
     "firebase-admin": "^13.6.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "axios": "^1.7.2",
+    "mongoose": "^8.0.0"
   }
 }
