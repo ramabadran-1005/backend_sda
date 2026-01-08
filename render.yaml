@@ -2,6 +2,7 @@ services:
   - type: web
     name: backend-sda
     env: node
-    buildCommand: "./render-build.sh"
-    startCommand: "npm start"
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "node app.cjs"
     autoDeploy: true
