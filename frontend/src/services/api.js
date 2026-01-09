@@ -1,10 +1,7 @@
 // src/services/api.js
 import axios from "axios";
 
-// Example:
-// VITE_API_BASE="https://backend-sda.onrender.com"
-const API_BASE = "https://backend-sda.onrender.com";
-
+const API_BASE = import.meta.env.VITE_API_BASE || "https://backend-nware.onrender.com";
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -69,6 +66,16 @@ export async function postReportGenerate(body = {}) {
   }
 }
 
+export async function getReports(limit = 200) {
+  try {
+    const res = await api.get("/api/reports", { params: { limit } });
+    return res.data;
+  } catch (e) {
+    console.error("getReports error:", e);
+    return [];
+  }
+}
+
 /* ---------------------- NODE HEALTH ---------------------- */
 export async function getNodeHealth() {
   try {
@@ -79,26 +86,16 @@ export async function getNodeHealth() {
     return [];
   }
 }
-export async function getReports(limit = 100) {
-  try {
-    const res = await api.get("/api/reports", { params: { limit } });
-    return res.data;
-  } catch (e) {
-    console.error("getReports error:", e);
-    return [];
-  }
 
-}
 /* ---------------------- LIVE NODES ---------------------- */
 export async function getLiveNodes(windowSec = 15) {
   try {
-    const res = await api.get('/api/live-nodes', { params: { window: windowSec } });
-    return res.data; // { count, window, nodes: [...] }
+    const res = await api.get("/api/live-nodes", { params: { window: windowSec } });
+    return res.data;
   } catch (e) {
     console.error("getLiveNodes error:", e);
-    return { count: 0, window: windowSec, nodes: [] };
+    return { nodes: [], count: 0 };
   }
 }
-
 
 export default api;

@@ -1,61 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { getMasterdata } from "../services/api";
+import { getLiveNodes } from "../services/api";
 
 export default function LiveNodesPage() {
-  const [liveNodes, setLiveNodes] = useState([]);
-  const [loading, setLoading] = useState(true);
-
+  const [data, setData] = useState({ nodes: [], count: 0 });
   async function load() {
-    const data = await getMasterdata();
-    const now = Date.now();
-
-    const lastSeen = {};
-
-    data.forEach((d) => {
-      const id = d.NodeID;
-      const ts = new Date(d.Timestamp || d.receivedAt).getTime();
-      if (!lastSeen[id]) lastSeen[id] = ts;
-    });
-
-    const active = Object.keys(lastSeen)
-      .filter((id) => now - lastSeen[id] < 60000) // 60 sec = LIVE
-      .map(Number);
-
-    setLiveNodes(active);
-    setLoading(false);
+    const d = await getLiveNodes(15);
+    setData(d || { nodes: [], count: 0 });
   }
-
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
+  useEffect(()=>{ load(); const t = setInterval(load, 3000); return ()=>clearInterval(t); }, []);
+  if (!data.nodes || data.nodes.length===0) return <div style={{padding:16}}>No active nodes</div>;
   return (
-    <div style={{ padding: 24 }}>
-      <h2>Live Nodes</h2>
-
-      {loading ? (
-        <p>Loading...</p>
-      ) : liveNodes.length === 0 ? (
-        <p>No active nodes right now.</p>
-      ) : (
-        <ul>
-          {liveNodes.map((id) => (
-            <li
-              key={id}
-              style={{
-                padding: 10,
-                background: "#e3ffe3",
-                marginBottom: 8,
-                borderRadius: 6,
-              }}
-            >
-              Node {id} — <strong>Active</strong>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div style={{padding:16}}>
+      <h3>Live Nodes ({data.count})</h3>
+      <ul>
+        {data.nodes.map(n => <li key={n.nodeId}>Node {n.nodeId} — lastSeen {n.lastSeen}</li>)}
+      </ul>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getMasterdata, getPredictionsLatest } from "../services/api";
+import { getMasterdata, getPredictionsLatest } from "../services/api.js";
+
+
 
 export default function NodeDetail() {
   const { nodeId } = useParams();
