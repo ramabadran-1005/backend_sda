@@ -1,112 +1,104 @@
+// src/services/api.js
 import axios from "axios";
 
-const API = axios.create({
-  baseURL: "https://backend-sda-5.onrender.com",
-  timeout: 15000,
+// Example:
+// VITE_API_BASE="https://backend-sda.onrender.com"
+const API_BASE = "https://backend-sda.onrender.com";
+
+
+const api = axios.create({
+  baseURL: API_BASE,
+  timeout: 10000,
 });
 
-const safe = (p) => (p && p.data ? p.data : []);
-
-// -------------------------
-// GET endpoints
-// -------------------------
-
-export async function getMasterdata() {
+/* ---------------------- MASTERDATA ---------------------- */
+export async function getMasterdata(nodeId = null, limit = 200) {
   try {
-    const r = await API.get("/api/masterdata");
-    return safe(r);
+    const params = {};
+    if (nodeId) params.nodeId = nodeId;
+    if (limit) params.limit = limit;
+
+    const res = await api.get("/api/masterdata", { params });
+    return res.data;
   } catch (e) {
     console.error("getMasterdata error:", e);
     return [];
   }
 }
 
-export async function getPredictionsLatest() {
+/* ---------------------- ALERTS ---------------------- */
+export async function getAlerts(limit = 100) {
   try {
-    const r = await API.get("/api/predictions/latest");
-    return safe(r);
-  } catch (e) {
-    console.error("getPredictionsLatest error:", e);
-    return [];
-  }
-}
-
-export async function getPredictions() {
-  try {
-    const r = await API.get("/api/predictions");
-    return safe(r);
-  } catch (e) {
-    console.error("getPredictions error:", e);
-    return [];
-  }
-}
-
-export async function getAlerts() {
-  try {
-    const r = await API.get("/api/alerts");
-    return safe(r);
+    const res = await api.get("/api/alerts", { params: { limit } });
+    return res.data;
   } catch (e) {
     console.error("getAlerts error:", e);
     return [];
   }
 }
 
-export async function getReports() {
+export async function postAlert(payload) {
   try {
-    const r = await API.get("/api/reports");
-    return safe(r);
+    const res = await api.post("/api/alerts", payload);
+    return res.data;
   } catch (e) {
-    console.error("getReports error:", e);
+    console.error("postAlert error:", e);
+    return {};
+  }
+}
+
+/* ---------------------- PREDICTIONS ---------------------- */
+export async function getPredictionsLatest(limit = 200) {
+  try {
+    const res = await api.get("/api/predictions/latest", { params: { limit } });
+    return res.data;
+  } catch (e) {
+    console.error("getPredictionsLatest error:", e);
     return [];
   }
 }
 
-// -------------------------
-// AUTH endpoints
-// -------------------------
-
-export async function registerUser(payload) {
+/* ---------------------- REPORTS ---------------------- */
+export async function postReportGenerate(body = {}) {
   try {
-    const r = await API.post("/api/auth/register", payload);
-    return r.data;
-  } catch (e) {
-    console.error("registerUser error:", e);
-    throw e;
-  }
-}
-
-export async function loginUser(payload) {
-  try {
-    const r = await API.post("/api/auth/login", payload);
-    return r.data;
-  } catch (e) {
-    console.error("loginUser error:", e);
-    throw e;
-  }
-}
-
-// -------------------------
-// POST endpoints
-// -------------------------
-
-export async function postAlert(payload) {
-  try {
-    const r = await API.post("/api/alerts", payload);
-    return r.data;
-  } catch (e) {
-    console.error("postAlert error:", e);
-    throw e;
-  }
-}
-
-export async function postReportGenerate(payload) {
-  try {
-    const r = await API.post("/api/reports/generate", payload);
-    return r.data;
+    const res = await api.post("/api/reports/generate", body);
+    return res.data;
   } catch (e) {
     console.error("postReportGenerate error:", e);
-    throw e;
+    return {};
   }
 }
 
-export default API;
+/* ---------------------- NODE HEALTH ---------------------- */
+export async function getNodeHealth() {
+  try {
+    const res = await api.get("/api/nodehealth");
+    return res.data;
+  } catch (e) {
+    console.error("getNodeHealth error:", e);
+    return [];
+  }
+}
+export async function getReports(limit = 100) {
+  try {
+    const res = await api.get("/api/reports", { params: { limit } });
+    return res.data;
+  } catch (e) {
+    console.error("getReports error:", e);
+    return [];
+  }
+
+}
+/* ---------------------- LIVE NODES ---------------------- */
+export async function getLiveNodes(windowSec = 15) {
+  try {
+    const res = await api.get('/api/live-nodes', { params: { window: windowSec } });
+    return res.data; // { count, window, nodes: [...] }
+  } catch (e) {
+    console.error("getLiveNodes error:", e);
+    return { count: 0, window: windowSec, nodes: [] };
+  }
+}
+
+
+export default api;

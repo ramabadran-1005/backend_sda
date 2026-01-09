@@ -17,6 +17,7 @@
     "@mui/material": "^7.3.5",
     "axios": "^1.13.2",
     "file-saver": "^2.0.5",
+    
     "jspdf": "^3.0.4",
     "papaparse": "^5.5.3",
     "query-string": "^9.3.1",

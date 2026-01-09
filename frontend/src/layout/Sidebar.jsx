@@ -31,7 +31,7 @@ const MENU = [
 ];
 
 // Use the uploaded screenshot path. Dev system will transform this to a URL.
-const LOGO_URL = "/mnt/data/Screenshot 2025-11-21 at 11.45.01.png";
+
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -42,7 +42,7 @@ export default function Sidebar() {
     <Box sx={{ width: 260, bgcolor: "#123b20", color: "#fff", display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <Box sx={{ p: 3, display: "flex", alignItems: "center", gap: 2 }}>
         <Box sx={{ width: 56, height: 56, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
-          <img src={LOGO_URL} alt="logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          
         </Box>
         <Box>
           <Typography variant="h6" sx={{ color: "#ffc107", fontWeight: 700 }}>NWarehouse</Typography>

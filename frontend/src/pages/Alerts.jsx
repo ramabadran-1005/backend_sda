@@ -4,7 +4,8 @@ import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
-import { getAlerts, postAlert, getMasterdata } from "../services/api";
+import { getAlerts, getMasterdata } from "../services/api";
+
 
 export default function Alerts() {
   const [alerts, setAlerts] = useState([]);

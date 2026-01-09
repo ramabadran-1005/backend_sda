@@ -1,0 +1,30 @@
+name: iot_dashboard_app
+description: "Offline demo IoT dashboard with local auth"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI Icons
+  cupertino_icons: ^1.0.8
+
+  # Only your actual needed packages
+  fl_chart: ^0.70.0
+  http: ^1.5.0
+  intl: ^0.18.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/warehouse_blueprint.png

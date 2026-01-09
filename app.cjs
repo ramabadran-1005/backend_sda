@@ -9,15 +9,16 @@ const morgan = require('morgan');
 const axios = require('axios');
 
 const app = express();
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '30mb' }));
 app.use(cors());
 app.use(helmet());
 app.use(compression());
 app.use(morgan('dev'));
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 10000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/nwarehouse';
-const ML_BASE = process.env.ML_BASE || 'http://10.100.75.165:5000';
+// IMPORTANT: default ML_BASE -> your deployed FastAPI service
+const ML_BASE = process.env.ML_BASE || 'https://fastapi-2-bj9b.onrender.com';
 
 const MAX_CONNECT_RETRIES = Number(process.env.MAX_CONNECT_RETRIES || 10);
 const RETRY_DELAY_MS = Number(process.env.RETRY_DELAY_MS || 5000);
@@ -29,16 +30,11 @@ let connectAttempts = 0;
 function cleanNodeId(raw) {
   if (raw === undefined || raw === null) return null;
   const s = String(raw);
-  // If it's already a clean integer string like "2101" -> return that
   if (/^\d+$/.test(s)) return Number(s);
-  // Extract all digit groups and join them
   const digits = s.match(/\d+/g);
   if (!digits) return null;
   const joined = digits.join('');
-  // If joined is empty or not numeric -> null
   if (!/^\d+$/.test(joined)) return null;
-  // trim leading zeros to avoid weird long numbers if you prefer:
-  // return Number(joined.replace(/^0+/, '') || '0');
   return Number(joined);
 }
 
@@ -51,8 +47,7 @@ async function connectWithRetry() {
       mongoConnected = true;
       console.log('✅ MongoDB connected');
       await ensureCollectionsExist();
-      // perform an initial nodehealth refresh and prediction refresh safely
-      try { await initialRefresh(); } catch (e) {}
+      try { await initialRefresh(); } catch (e) { console.error('initialRefresh failed', e); }
       break;
     } catch (err) {
       console.error(`Mongo connect attempt ${connectAttempts} failed:`, err.message || err);
@@ -88,10 +83,10 @@ async function ensureCollectionsExist() {
 
 async function initialRefresh() {
   try {
-    // rebuild nodehealth from masterdatas
     if (!database) return;
+    // build nodehealth from masterdatas (simple)
     const masterRows = await database.collection('masterdatas').find().toArray();
-    if (masterRows.length === 0) return;
+    if (!masterRows || masterRows.length === 0) return;
     const map = {};
     for (const r of masterRows) {
       const idRaw = r.NodeID ?? r.nodeId ?? null;
@@ -106,52 +101,6 @@ async function initialRefresh() {
       await database.collection('nodehealth').deleteMany({});
       await database.collection('nodehealth').insertMany(arr);
       console.log('nodehealth initial refresh complete:', arr.length);
-    }
-
-    // optional: initial predictions refresh (latest per node)
-    // We'll create one heuristic prediction per distinct node using last reading
-    const latestByNode = {};
-    for (const r of masterRows) {
-      const id = cleanNodeId(r.NodeID ?? r.nodeId);
-      const key = id === null ? 'unknown' : id;
-      // choose latest by Timestamp string (not perfect) — if Timestamp missing, keep first
-      if (!latestByNode[key]) latestByNode[key] = r;
-      else {
-        const prev = latestByNode[key];
-        try {
-          const a = new Date(String(r.Timestamp));
-          const b = new Date(String(prev.Timestamp));
-          if (!isNaN(a.getTime()) && a > b) latestByNode[key] = r;
-        } catch (e) {}
-      }
-    }
-    const preds = [];
-    for (const k of Object.keys(latestByNode)) {
-      const row = latestByNode[k];
-      const t1 = Number(row.TGS2620 || row.tgs2620 || 0);
-      const t2 = Number(row.TGS2602 || row.tgs2602 || 0);
-      const t3 = Number(row.TGS2600 || row.tgs2600 || 0);
-      // simple heuristic: weighted sum normalized
-      const denom = Math.max(t1, t2, t3, 1);
-      const raw = (0.4 * (t1/denom) + 0.3 * (t2/denom) + 0.3 * (t3/denom));
-      const riskScore = Math.round(Math.min(100, Math.max(0, raw * 100)) * 10000) / 10000;
-      const status = riskScore > 50 ? 'High' : riskScore > 20 ? 'Medium' : 'Healthy';
-      preds.push({
-        nodeId: k === 'unknown' ? null : k,
-        tgs2620: t1,
-        tgs2602: t2,
-        tgs2600: t3,
-        timestamp: row.Timestamp || new Date().toISOString(),
-        riskScore,
-        status,
-        modelUsed: 'heuristic',
-        createdAt: new Date()
-      });
-    }
-    if (preds.length > 0) {
-      await database.collection('predictions').deleteMany({});
-      await database.collection('predictions').insertMany(preds);
-      console.log('predictions initial refresh complete:', preds.length);
     }
   } catch (e) {
     console.error('initialRefresh failed:', e.message || e);
@@ -194,7 +143,8 @@ app.get('/api/alerts', async (req, res) => {
   const db = getDb();
   try {
     if (!db) return res.json([]);
-    const rows = await db.collection('alerts').find().sort({ timestamp: -1 }).toArray();
+    const limit = Number(req.query.limit || 100);
+    const rows = await db.collection('alerts').find().sort({ timestamp: -1 }).limit(limit).toArray();
     return res.json(rows);
   } catch (e) { console.error('/api/alerts', e); return res.status(500).json({ error: 'Failed' }); }
 });
@@ -219,7 +169,8 @@ app.get('/api/masterdata', async (req, res) => {
       const nid = cleanNodeId(req.query.nodeId);
       if (nid !== null) query.NodeID = nid;
     }
-    const rows = await db.collection('masterdatas').find(query).sort({ Timestamp: -1 }).limit(500).toArray();
+    const limit = Math.min(2000, Number(req.query.limit || 500));
+    const rows = await db.collection('masterdatas').find(query).sort({ Timestamp: -1, receivedAt: -1 }).limit(limit).toArray();
     return res.json(rows);
   } catch (e) { console.error('/api/masterdata', e); return res.status(500).json({ error: 'Failed' }); }
 });
@@ -227,6 +178,9 @@ app.get('/api/masterdata', async (req, res) => {
 app.post('/api/masterdata', async (req, res) => {
   const db = getDb();
   try {
+    // log incoming payload (helpful for ESP32 debugging)
+    console.log('📥 /api/masterdata:', Array.isArray(req.body) ? '[array]' : req.body);
+
     if (!db) return res.status(503).json({ error: 'DB not available' });
 
     if (Array.isArray(req.body)) {
@@ -293,7 +247,13 @@ app.post('/api/reports/generate', async (req, res) => {
     const report = {
       createdAt: new Date(),
       type: req.body.type || 'AutoReport',
-      summary: { totalReadings: masterRows.length, totalNodes: new Set(masterRows.map((r) => cleanNodeId(r.NodeID ?? r.nodeId))).size }
+      params: req.body || {},
+      // fullDump includes raw masterRows if requested
+      payload: req.body.fullDump ? masterRows : undefined,
+      summary: {
+        totalReadings: masterRows.length,
+        totalNodes: new Set(masterRows.map((r) => cleanNodeId(r.NodeID ?? r.nodeId))).size
+      }
     };
     const r = await db.collection('reports').insertOne(report);
     return res.status(201).json({ reportId: r.insertedId, summary: report.summary });
@@ -301,33 +261,80 @@ app.post('/api/reports/generate', async (req, res) => {
 });
 
 /* --------------------- PREDICTIONS ---------------------- */
+// latest predictions
 app.get('/api/predictions/latest', async (req, res) => {
   const db = getDb();
   try {
     if (!db) return res.json([]);
-    const rows = await db.collection('predictions').find().sort({ timestamp: -1 }).limit(500).toArray();
+    const rows = await db.collection('predictions').find().sort({ timestamp: -1, createdAt: -1 }).limit(500).toArray();
     return res.json(rows);
   } catch (e) { console.error('/api/predictions/latest', e); return res.status(500).json({ error: 'Failed' }); }
 });
 
-// Predict route: forwards to ML service; store cleaned nodeId in DB
+// forward to ML model (your FastAPI)
 app.post('/api/predictions/predict', async (req, res) => {
   try {
-    const mlResponse = await axios.post(`${ML_BASE}/predict`, req.body, { headers: { 'Content-Type': 'application/json' }, timeout: 15000 });
-    const db = getDb();
-    const nodeIdClean = cleanNodeId(req.body.nodeId ?? req.body.NodeID);
-    const payload = Object.assign({}, mlResponse.data, {
-      nodeId: nodeIdClean,
-      timestamp: mlResponse.data.timestamp ? mlResponse.data.timestamp : new Date().toISOString(),
-      createdAt: new Date()
+    const nodeId = cleanNodeId(req.body.nodeId ?? req.body.NodeID);
+    // forward exactly the incoming payload
+    const mlResp = await axios.post(`${ML_BASE}/predict`, req.body, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 25000
     });
+
+    const result = mlResp.data;
+    const db = getDb();
+    const payloadToStore = {
+      nodeId,
+      ...result,
+      timestamp: result.timestamp ? result.timestamp : new Date().toISOString(),
+      createdAt: new Date()
+    };
+
     if (db) {
-      try { await db.collection('predictions').insertOne(payload); } catch(e){ console.error('store prediction failed', e); }
+      try { await db.collection('predictions').insertOne(payloadToStore); } catch(e){ console.error('store prediction failed', e); }
     }
-    return res.json(mlResponse.data);
+
+    return res.json(result);
   } catch (e) {
     console.error('/api/predictions/predict error', e.message || e);
-    return res.status(502).json({ error: 'ML service failed', detail: e.message || String(e) });
+    return res.status(500).json({ error: 'ML service failed', detail: e.message || String(e) });
+  }
+});
+
+/* --------------------- LIVE NODES ---------------------- */
+/**
+ * GET /api/live-nodes?window=15
+ * returns { nodes: [{ nodeId, lastSeen }], count: n }
+ */
+app.get('/api/live-nodes', async (req, res) => {
+  try {
+    const windowSec = Math.max(5, Number(req.query.window || 15));
+    const windowMs = windowSec * 1000;
+    const db = getDb();
+
+    // prefer to compute from masterdatas
+    if (!db) return res.json({ nodes: [], count: 0 });
+
+    // find recent records within larger window to determine last seen
+    const rows = await db.collection('masterdatas').find().sort({ receivedAt: -1 }).limit(5000).toArray();
+    const now = Date.now();
+    const lastSeen = {};
+    for (const r of rows) {
+      const id = cleanNodeId(r.NodeID ?? r.nodeId);
+      if (id === null) continue;
+      let ts = null;
+      if (r.receivedAt) ts = new Date(r.receivedAt).getTime();
+      else if (r.Timestamp) ts = (new Date(String(r.Timestamp))).getTime();
+      else if (r.timestamp) ts = (new Date(String(r.timestamp))).getTime();
+      if (!ts || isNaN(ts)) continue;
+      const prev = lastSeen[id] || 0;
+      if (ts > prev) lastSeen[id] = ts;
+    }
+    const nodes = Object.keys(lastSeen).filter(k => (now - lastSeen[k]) < windowMs).map(k => ({ nodeId: Number(k), lastSeen: new Date(lastSeen[k]).toISOString() }));
+    return res.json({ nodes, count: nodes.length, windowSec });
+  } catch (e) {
+    console.error('/api/live-nodes error', e);
+    return res.status(500).json({ error: 'Failed' });
   }
 });
 
