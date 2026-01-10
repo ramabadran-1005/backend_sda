@@ -1,4 +1,4 @@
-// app.cjs — Render + MongoDB Atlas READY
+// app.cjs — Render + MongoDB Atlas (STABLE)
 
 require('dotenv').config();
 const express = require('express');
@@ -21,7 +21,7 @@ app.use(morgan('dev'));
 /* -------------------- CONFIG -------------------- */
 const PORT = process.env.PORT || 10000;
 const MONGO_URI = process.env.MONGO_URI;
-const DB_NAME = 'NWARE';
+const DB_NAME = 'nwarehouse';
 const ML_BASE = process.env.ML_BASE || 'https://fastapi-2-bj9b.onrender.com';
 
 if (!MONGO_URI) {
@@ -35,12 +35,12 @@ let database = null;
 
 /* -------------------- UTILS -------------------- */
 function cleanNodeId(raw) {
-  if (raw === null || raw === undefined) return null;
-  const digits = String(raw).match(/\d+/g);
-  return digits ? Number(digits.join('')) : null;
+  if (raw === undefined || raw === null) return null;
+  const m = String(raw).match(/\d+/g);
+  return m ? Number(m.join('')) : null;
 }
 
-/* -------------------- MONGODB CONNECT -------------------- */
+/* -------------------- CONNECT MONGO -------------------- */
 async function connectMongo() {
   try {
     await mongoose.connect(MONGO_URI, {
@@ -51,35 +51,15 @@ async function connectMongo() {
     database = mongoose.connection.db;
     mongoConnected = true;
     console.log('✅ MongoDB Atlas connected');
-
-    await ensureCollections();
   } catch (err) {
     mongoConnected = false;
     console.error('❌ MongoDB connection failed:', err.message);
   }
 }
 
-async function ensureCollections() {
-  const required = [
-    'warehouses',
-    'alerts',
-    'masterdatas',
-    'nodehealth',
-    'reports',
-    'predictions',
-  ];
+connectMongo();
 
-  const existing = (await database.listCollections().toArray()).map(c => c.name);
-
-  for (const col of required) {
-    if (!existing.includes(col)) {
-      await database.createCollection(col);
-      console.log(`📁 Created collection: ${col}`);
-    }
-  }
-}
-
-/* Auto reconnect */
+/* Auto reconnect (Render safe) */
 setInterval(() => {
   if (!mongoConnected) {
     console.log('🔁 Reconnecting MongoDB...');
@@ -87,9 +67,7 @@ setInterval(() => {
   }
 }, 15000);
 
-connectMongo();
-
-/* -------------------- HELPERS -------------------- */
+/* -------------------- DB HELPER -------------------- */
 function getDb(res) {
   if (!mongoConnected || !database) {
     res.status(503).json({ error: 'DB not available' });
@@ -121,10 +99,10 @@ app.get('/api/masterdata', async (req, res) => {
     if (nid !== null) query.NodeID = nid;
   }
 
+  // ⚠️ NO SORT — prevents empty result bug
   const rows = await db
     .collection('masterdatas')
     .find(query)
-    .sort({ receivedAt: -1 })
     .limit(limit)
     .toArray();
 
@@ -160,28 +138,14 @@ app.get('/api/alerts', async (req, res) => {
   if (!db) return;
 
   const limit = Number(req.query.limit || 100);
+
   const rows = await db
     .collection('alerts')
     .find()
-    .sort({ timestamp: -1 })
     .limit(limit)
     .toArray();
 
   res.json(rows);
-});
-
-app.post('/api/alerts', async (req, res) => {
-  const db = getDb(res);
-  if (!db) return;
-
-  const payload = {
-    ...req.body,
-    nodeId: cleanNodeId(req.body.nodeId ?? req.body.NodeID),
-    timestamp: new Date(),
-  };
-
-  const r = await db.collection('alerts').insertOne(payload);
-  res.status(201).json({ insertedId: r.insertedId });
 });
 
 /* -------------------- LIVE NODES -------------------- */
@@ -192,19 +156,29 @@ app.get('/api/live-nodes', async (req, res) => {
   const windowMs = Number(req.query.window || 15) * 1000;
   const now = Date.now();
 
+  // ⚠️ NO SORT
   const rows = await db
     .collection('masterdatas')
     .find()
-    .sort({ receivedAt: -1 })
     .limit(5000)
     .toArray();
 
   const lastSeen = {};
+
   for (const r of rows) {
     const id = cleanNodeId(r.NodeID ?? r.nodeId);
-    if (!id || !r.receivedAt) continue;
-    const ts = new Date(r.receivedAt).getTime();
-    if (!lastSeen[id] || ts > lastSeen[id]) lastSeen[id] = ts;
+    if (id === null) continue;
+
+    const ts =
+      r.receivedAt ? new Date(r.receivedAt).getTime()
+      : r.Timestamp ? new Date(r.Timestamp).getTime()
+      : null;
+
+    if (!ts || isNaN(ts)) continue;
+
+    if (!lastSeen[id] || ts > lastSeen[id]) {
+      lastSeen[id] = ts;
+    }
   }
 
   const nodes = Object.entries(lastSeen)
@@ -220,21 +194,21 @@ app.get('/api/live-nodes', async (req, res) => {
 /* -------------------- PREDICTIONS -------------------- */
 app.post('/api/predictions/predict', async (req, res) => {
   try {
-    const ml = await axios.post(`${ML_BASE}/predict`, req.body, {
+    const mlResp = await axios.post(`${ML_BASE}/predict`, req.body, {
       timeout: 20000,
     });
 
-    const db = mongoConnected ? database : null;
-    if (db) {
-      await db.collection('predictions').insertOne({
-        ...ml.data,
-        nodeId: cleanNodeId(req.body.nodeId),
+    if (mongoConnected && database) {
+      await database.collection('predictions').insertOne({
+        ...mlResp.data,
+        nodeId: cleanNodeId(req.body.nodeId ?? req.body.NodeID),
         createdAt: new Date(),
       });
     }
 
-    res.json(ml.data);
+    res.json(mlResp.data);
   } catch (e) {
+    console.error('ML error:', e.message);
     res.status(500).json({ error: 'ML service failed' });
   }
 });
