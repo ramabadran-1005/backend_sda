@@ -10,3 +10,4 @@ coverage/
 
 serviceAccountKey.json
 fastapi_service/saved_models/
+fastapi_service/saved_models/
