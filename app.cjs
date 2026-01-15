@@ -1,4 +1,4 @@
-// app.cjs — FINAL STABLE (Render + MongoDB Atlas)
+// app.cjs — FINAL, MATCHES YOUR DATA EXACTLY
 
 require('dotenv').config();
 const express = require('express');
@@ -11,7 +11,7 @@ const morgan = require('morgan');
 const app = express();
 
 /* -------------------- MIDDLEWARE -------------------- */
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '30mb' }));
 app.use(cors({ origin: '*' }));
 app.use(helmet());
 app.use(compression());
@@ -20,93 +20,94 @@ app.use(morgan('dev'));
 /* -------------------- CONFIG -------------------- */
 const PORT = process.env.PORT || 10000;
 const MONGO_URI = process.env.MONGO_URI;
-const DB_NAME = 'NWARE';
+const DB_NAME = 'nwarehouse';
 
 if (!MONGO_URI) {
   console.error('❌ MONGO_URI missing');
   process.exit(1);
 }
 
-/* -------------------- CONNECT MONGO -------------------- */
-mongoose
-  .connect(MONGO_URI, {
-    dbName: DB_NAME,
-    serverSelectionTimeoutMS: 10000,
-  })
-  .then(() => console.log('✅ MongoDB Atlas connected'))
-  .catch(err => {
-    console.error('❌ MongoDB connection failed:', err.message);
-    process.exit(1);
-  });
+/* -------------------- DB STATE -------------------- */
+let db = null;
 
-const db = () => mongoose.connection.db;
+/* -------------------- CONNECT -------------------- */
+mongoose
+  .connect(MONGO_URI, { dbName: DB_NAME })
+  .then(() => {
+    db = mongoose.connection.db;
+    console.log('✅ MongoDB Atlas connected');
+  })
+  .catch(err => {
+    console.error('❌ MongoDB error:', err.message);
+  });
 
 /* -------------------- HEALTH -------------------- */
 app.get('/healthz', (req, res) => {
   res.json({
     ok: true,
-    mongoConnected: mongoose.connection.readyState === 1,
+    mongoConnected: !!db,
     dbName: DB_NAME,
   });
 });
 
 /* -------------------- MASTERDATA -------------------- */
 app.get('/api/masterdata', async (req, res) => {
-  const rows = await db()
-    .collection('masterdatas')
-    .find({})
-    .limit(200)
-    .toArray();
-  res.json(rows);
-});
+  try {
+    if (!db) return res.status(503).json([]);
 
-app.post('/api/masterdata', async (req, res) => {
-  const doc = {
-    ...req.body,
-    NodeID: Number(String(req.body.NodeID).replace(/\D/g, '')),
-    receivedAt: new Date(),
-  };
-  const r = await db().collection('masterdatas').insertOne(doc);
-  res.status(201).json({ insertedId: r.insertedId });
-});
+    const query = {};
+    if (req.query.nodeId) {
+      query.NodeId = Number(req.query.nodeId); // ✅ EXACT FIELD
+    }
 
-/* -------------------- ALERTS -------------------- */
-app.get('/api/alerts', async (req, res) => {
-  const rows = await db()
-    .collection('alerts')
-    .find({})
-    .limit(100)
-    .toArray();
-  res.json(rows);
+    const limit = Number(req.query.limit || 200);
+
+    const rows = await db
+      .collection('masterdatas')
+      .find(query)
+      .limit(limit)
+      .toArray();
+
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json([]);
+  }
 });
 
 /* -------------------- LIVE NODES -------------------- */
 app.get('/api/live-nodes', async (req, res) => {
-  const rows = await db()
-    .collection('masterdatas')
-    .find({})
-    .limit(5000)
-    .toArray();
+  try {
+    if (!db) return res.json({ nodes: [], count: 0 });
 
-  const now = Date.now();
-  const seen = {};
+    const rows = await db
+      .collection('masterdatas')
+      .find()
+      .limit(5000)
+      .toArray();
 
-  for (const r of rows) {
-    if (!r.NodeID || !r.receivedAt) continue;
-    const ts = new Date(r.receivedAt).getTime();
-    if (!seen[r.NodeID] || ts > seen[r.NodeID]) {
-      seen[r.NodeID] = ts;
-    }
-  }
+    const seen = {};
+    rows.forEach(r => {
+      if (r.NodeId !== undefined) {
+        seen[r.NodeId] = true;
+      }
+    });
 
-  const nodes = Object.keys(seen)
-    .filter(id => now - seen[id] < 15000)
-    .map(id => ({
+    const nodes = Object.keys(seen).map(id => ({
       nodeId: Number(id),
-      lastSeen: new Date(seen[id]).toISOString(),
     }));
 
-  res.json({ nodes, count: nodes.length });
+    res.json({ nodes, count: nodes.length });
+  } catch (e) {
+    res.status(500).json({ nodes: [], count: 0 });
+  }
+});
+
+/* -------------------- ALERTS -------------------- */
+app.get('/api/alerts', async (req, res) => {
+  if (!db) return res.json([]);
+  const rows = await db.collection('alerts').find().limit(100).toArray();
+  res.json(rows);
 });
 
 /* -------------------- START -------------------- */
