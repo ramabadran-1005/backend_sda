@@ -108,7 +108,43 @@ app.get('/api/alerts', async (req, res) => {
   if (!db) return res.json([]);
   const rows = await db.collection('alerts').find().limit(100).toArray();
   res.json(rows);
+});app.get('/api/predictions/latest', async (req, res) => {
+  try {
+    if (!database) return res.json([]);
+
+    const limit = Math.min(500, Number(req.query.limit || 200));
+
+    const rows = await database
+      .collection('predictions')
+      .find()
+      .limit(limit)
+      .toArray();
+
+    res.json(rows);
+  } catch (e) {
+    console.error('predictions/latest error', e);
+    res.status(500).json([]);
+  }
+});app.get('/api/predictions/latest', async (req, res) => {
+  try {
+    if (!database) return res.json([]);
+
+    const limit = Math.min(500, Number(req.query.limit || 200));
+
+    const rows = await database
+      .collection('predictions')
+      .find({})
+      .limit(limit)
+      .toArray();
+
+    res.json(rows);
+  } catch (err) {
+    console.error('predictions/latest error', err);
+    res.status(500).json([]);
+  }
 });
+
+
 
 /* -------------------- START -------------------- */
 app.listen(PORT, '0.0.0.0', () => {
